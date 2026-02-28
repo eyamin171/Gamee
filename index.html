@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fast Response Generic Mobile</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; }
+        
+        #webcam-container {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 150px; height: 112px;
+            border: 2px solid #00ffcc; border-radius: 10px;
+            overflow: hidden; z-index: 20; background: black;
+            transform: scaleX(-1); 
+        }
+        #input_video { width: 100%; height: 100%; object-fit: cover; }
+
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #00ffcc; font-family: sans-serif; font-size: 18px;
+            background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 8px;
+            border: 1px solid #00ffcc; text-align: center; z-index: 30;
+        }
+        .hidden { display: none !important; }
+        
+        #status {
+            position: absolute; top: 20px; width: 100%; text-align: center;
+            color: #00ffcc; font-family: monospace; font-size: 18px;
+            pointer-events: none; z-index: 10; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+
+    <div id="webcam-container">
+        <video id="input_video" playsinline></video>
+    </div>
+    
+    <div id="loading">System Initializing...<br>Please Grant Camera Permission</div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.set(0, 10, 50); 
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        let interactionTarget = 0; 
+        let interactionCurrent = 0; 
+        let rotationSpeed = 0;      
+
+        const particleCount = 40000; 
+        const geometry = new THREE.BufferGeometry();
+        const currentPositions = new Float32Array(particleCount * 3);
+        const targetPositions = new Float32Array(particleCount * 3);
+        const startPositions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            const r = 100 + Math.random() * 50;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            
+            startPositions[i3] = r * Math.sin(phi) * Math.cos(theta);
+            startPositions[i3+1] = r * Math.sin(phi) * Math.sin(theta);
+            startPositions[i3+2] = r * Math.cos(phi);
+
+            currentPositions[i3] = startPositions[i3];
+            currentPositions[i3+1] = startPositions[i3+1];
+            currentPositions[i3+2] = startPositions[i3+2];
+            
+            colors[i3] = 0; colors[i3+1] = 0.5; colors[i3+2] = 1;
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const material = new THREE.PointsMaterial({
+            size: 0.15, vertexColors: true, blending: THREE.AdditiveBlending,
+            transparent: true, opacity: 0.9, depthWrite: false
+        });
+
+        const particleSystem = new THREE.Points(geometry, material);
+        scene.add(particleSystem);
+
+        let modelLoaded = false;
+        
+        // ডিফল্ট জ্যামিতি (Sphere) তৈরি
+        const defaultGeometry = new THREE.IcosahedronGeometry(12, 1);
+        const defaultMaterial = new THREE.MeshBasicMaterial();
+        const defaultMesh = new THREE.Mesh(defaultGeometry, defaultMaterial);
+
+        defaultMesh.updateMatrixWorld(true);
+        const meshes = [{ mesh: defaultMesh, weight: 1 }];
+        let totalArea = 1;
+
+        let globalIndex = 0;
+        const tempPos = new THREE.Vector3();
+
+        meshes.forEach((item) => {
+            let count = Math.floor((item.weight / totalArea) * particleCount);
+            const sampler = new MeshSurfaceSampler(item.mesh).build();
+
+            for (let i = 0; i < count; i++) {
+                if (globalIndex >= particleCount) break;
+                sampler.sample(tempPos);
+                tempPos.applyMatrix4(item.mesh.matrixWorld);
+
+                const i3 = globalIndex * 3;
+                targetPositions[i3] = tempPos.x;
+                targetPositions[i3+1] = tempPos.y;
+                targetPositions[i3+2] = tempPos.z;
+
+                colors[i3] = 0.8 + (tempPos.x * 0.05);
+                colors[i3+1] = 0.1;
+                colors[i3+2] = 0.1;
+
+                globalIndex++;
+            }
+        });
+
+        while(globalIndex < particleCount) {
+             const i3 = globalIndex * 3;
+             targetPositions[i3] = 0; targetPositions[i3+1] = 0; targetPositions[i3+2] = 0;
+             globalIndex++;
+        }
+
+        modelLoaded = true;
+        document.getElementById('loading').innerHTML = "Ready! Show Fist ✊";
+        setTimeout(() => document.getElementById('loading').classList.add('hidden'), 2000);
+
+
+        const videoElement = document.getElementById('input_video');
+        const statusElement = document.getElementById('status');
+        
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const wrist = landmarks[0];
+                const tips = [8, 12, 16, 20];
+                const bases = [5, 9, 13, 17];
+                
+                let foldedFingers = 0;
+                for(let i=0; i<4; i++) {
+                    const distTip = getDistance(landmarks[tips[i]], wrist);
+                    const distBase = getDistance(landmarks[bases[i]], wrist);
+                    if (distTip < distBase) foldedFingers++;
+                }
+
+                if (foldedFingers >= 3) {
+                    interactionTarget = 1;
+                    statusElement.innerText = "✊ ASSEMBLE SPHERE";
+                } else {
+                    interactionTarget = 0;
+                    statusElement.innerText = "🖐 EXPLODE SPHERE";
+                }
+
+                const handX = wrist.x;
+                if (handX < 0.4) rotationSpeed = -0.03;
+                else if (handX > 0.6) rotationSpeed = 0.03;
+                else rotationSpeed = 0;
+
+            } else {
+                statusElement.innerText = "Waiting for Hand...";
+                rotationSpeed = 0.005;
+            }
+        }
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => await hands.send({image: videoElement}),
+            width: 320, height: 240
+        });
+        cameraUtils.start();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!modelLoaded) {
+                particleSystem.rotation.y += 0.02;
+                renderer.render(scene, camera);
+                return;
+            }
+
+            interactionCurrent += (interactionTarget - interactionCurrent) * 0.15;
+
+            const positions = particleSystem.geometry.attributes.position.array;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                
+                const tx = THREE.MathUtils.lerp(startPositions[i3], targetPositions[i3], interactionCurrent);
+                const ty = THREE.MathUtils.lerp(startPositions[i3+1], targetPositions[i3+1], interactionCurrent);
+                const tz = THREE.MathUtils.lerp(startPositions[i3+2], targetPositions[i3+2], interactionCurrent);
+
+                positions[i3] += (tx - positions[i3]) * 0.2; 
+                positions[i3+1] += (ty - positions[i3+1]) * 0.2;
+                positions[i3+2] += (tz - positions[i3+2]) * 0.2;
+            }
+
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+            particleSystem.rotation.y += rotationSpeed;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
