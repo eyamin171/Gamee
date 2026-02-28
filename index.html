@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fast Response Generic Mobile</title>
+    <title>Fast Response Corrected</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -84,6 +84,7 @@
 
         for (let i = 0; i < particleCount; i++) {
             const i3 = i * 3;
+            // Explosion radius
             const r = 100 + Math.random() * 50;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -112,7 +113,6 @@
 
         let modelLoaded = false;
         
-        // ডিফল্ট জ্যামিতি (Sphere) তৈরি
         const defaultGeometry = new THREE.IcosahedronGeometry(12, 1);
         const defaultMaterial = new THREE.MeshBasicMaterial();
         const defaultMesh = new THREE.Mesh(defaultGeometry, defaultMaterial);
@@ -178,11 +178,12 @@
                     if (distTip < distBase) foldedFingers++;
                 }
 
+                // *** লজিক পরিবর্তন করা হয়েছে এখানে ***
                 if (foldedFingers >= 3) {
-                    interactionTarget = 1;
+                    interactionTarget = 1; // মুঠ করলে (Fist) -> Assemble (গোলক)
                     statusElement.innerText = "✊ ASSEMBLE SPHERE";
                 } else {
-                    interactionTarget = 0;
+                    interactionTarget = 0; // হাত খুললে (Open) -> Explode (ছড়িয়ে পড়া)
                     statusElement.innerText = "🖐 EXPLODE SPHERE";
                 }
 
@@ -216,6 +217,7 @@
                 return;
             }
 
+            // এই ভ্যালুটা কমিয়ে দিলে ট্রানজিশন স্মুথ হবে
             interactionCurrent += (interactionTarget - interactionCurrent) * 0.15;
 
             const positions = particleSystem.geometry.attributes.position.array;
