@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fast Response Corrected</title>
+    <title>Fast Response Smooth</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -84,7 +84,6 @@
 
         for (let i = 0; i < particleCount; i++) {
             const i3 = i * 3;
-            // Explosion radius
             const r = 100 + Math.random() * 50;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -178,12 +177,12 @@
                     if (distTip < distBase) foldedFingers++;
                 }
 
-                // *** লজিক পরিবর্তন করা হয়েছে এখানে ***
+                // এখানে লজিকটি আগের মতোই রাখা হয়েছে (মুঠ = গোলক, খোলা = বিস্ফোরণ)
                 if (foldedFingers >= 3) {
-                    interactionTarget = 1; // মুঠ করলে (Fist) -> Assemble (গোলক)
+                    interactionTarget = 1;
                     statusElement.innerText = "✊ ASSEMBLE SPHERE";
                 } else {
-                    interactionTarget = 0; // হাত খুললে (Open) -> Explode (ছড়িয়ে পড়া)
+                    interactionTarget = 0;
                     statusElement.innerText = "🖐 EXPLODE SPHERE";
                 }
 
@@ -217,7 +216,7 @@
                 return;
             }
 
-            // এই ভ্যালুটা কমিয়ে দিলে ট্রানজিশন স্মুথ হবে
+            // ট্রানজিশন স্পিড ০.১৫ এ সেট করা হয়েছে যাতে স্মুথ ট্রানজিশন পাওয়া যায়।
             interactionCurrent += (interactionTarget - interactionCurrent) * 0.15;
 
             const positions = particleSystem.geometry.attributes.position.array;
